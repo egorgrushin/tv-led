@@ -35,7 +35,9 @@ bool buildSettings() {
   isUpdated |= hub.Switch(&data.isStaModeEnabled, F("Use STA mode"));
   hub.EndWidgets();
   hub.Button(&restartBtn, F("Restart"));
-  hub.Button(&resetBtn, F("Reset to default"));
+  hub.BeginWidgets();
+  hub.Button(&resetBtn, F("Reset to default (Hold for 5 seconds for reset)"), GHcolor(255, 0, 0));
+  hub.EndWidgets();
   return isUpdated;
 }
 
@@ -75,6 +77,7 @@ void hubBuild() {
   }
 }
 
+GHtimer resetTimer;
 
 void hubSetup() {
   hub.onBuild(hubBuild);
@@ -86,11 +89,22 @@ void processBtns() {
     dataSaveAndRestart();
   }
   if (resetBtn.changed()) {
-    dataResetAndRestart();
+    if (resetBtn) {
+      resetTimer.start(5000);
+    } else {
+      resetTimer.stop();
+    }
+
   }
 }
 
 void hubTick() {
   hub.tick();
   processBtns();
+  if (resetTimer) {
+    resetTimer.stop();
+    if (resetBtn) {
+      dataResetAndRestart();
+    }
+  }
 }
