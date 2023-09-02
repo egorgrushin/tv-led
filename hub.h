@@ -44,8 +44,9 @@ bool buildSettings() {
 bool buildMain() {
   bool isUpdated = false;
   hub.BeginWidgets();
-  hub.WidgetSize(20);
-  isUpdated |= hub.Switch(&data.isLedEnabled, F("Toggle"));
+  hub.WidgetSize(40);
+
+  isUpdated |= hub.Switch_(F("LedToggle"), &data.isLedEnabled, F("Toggle"));
   String presetsNames = "";
   for (byte i = 0; i < MAX_PRESETS_SIZE; i++) {
     presetsNames += String(data.presets[i].name);
@@ -53,7 +54,7 @@ bool buildMain() {
       presetsNames += ",";
     }
   }
-  hub.WidgetSize(80);
+  hub.WidgetSize(60);
   isUpdated |= hub.Select(&data.currentPresetIndex, presetsNames, F("Preset"));
 
   hub.EndWidgets();
@@ -61,8 +62,10 @@ bool buildMain() {
 }
 
 void hubBuild() {
-  hub.Tabs(&tabIndex, F("Main,Presets,Settings"));
   bool isUpdated = false;
+  if (hub.Tabs(&tabIndex, F("Main,Presets,Settings"))) {
+    hub.refresh();
+  }
   if (tabIndex == 0) {
     isUpdated |= buildMain();
   }
@@ -98,8 +101,16 @@ void processBtns() {
   }
 }
 
+void updateToggle() {
+  static GHtimer tmr(1000);
+  if (tmr) {
+    hub.sendUpdate("LedToggle", String(data.isLedEnabled));
+  }
+}
+
 void hubTick() {
   hub.tick();
+  updateToggle();
   processBtns();
   if (resetTimer) {
     resetTimer.stop();

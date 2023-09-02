@@ -2,10 +2,10 @@
 #include "wifi.h"
 #include "hub.h"
 #include "led.h"
+#include "button.h"
 
 
 void setup() {
-    Serial.begin(115200);
     dataSetup();
     clearOnboardLed();
     wifiSetup();
@@ -17,6 +17,7 @@ void loop() {
     dataTick();
     hubTick();
     ledTick();
+    buttonTick();
 }
 
 void clearOnboardLed() {
