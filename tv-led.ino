@@ -1,6 +1,7 @@
 #include "data.h"
 #include "wifi.h"
 #include "hub.h"
+#include "mqtt.h"
 #include "led.h"
 #include "button.h"
 
@@ -10,6 +11,7 @@ void setup() {
     clearOnboardLed();
     wifiSetup();
     hubSetup();
+    mqttSetup();
     ledSetup();
 }
 

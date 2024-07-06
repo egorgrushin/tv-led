@@ -1,121 +1,141 @@
-#define GH_INCLUDE_PORTAL
-
 #include <GyverHub.h>
 
 GyverHub hub("gh", "TvLed", "");
 
-uint8_t tabIndex = 0;
-GHbutton restartBtn;
-GHbutton resetBtn;
+byte tab = 0;
 
+struct PresetState {
+  bool isLocked = true;
+};
 
+PresetState states[MAX_PRESETS_SIZE] = {};
 
-bool buildPresets() {
-  bool isUpdated = false;
-
+void buildPresets(gh::Builder& b) {
   for (byte i = 0; i < MAX_PRESETS_SIZE; i++) {
-    hub.BeginWidgets();
-    hub.WidgetSize(80);
-    isUpdated |= hub.Input(&data.presets[i].name, GH_CSTR, F("Name"));
-    isUpdated |= hub.Slider(&data.presets[i].hue, GH_UINT8, F("Hue"), 0, 255, 1);
-    isUpdated |= hub.Slider(&data.presets[i].saturation, GH_UINT8, F("Saturation"), 0, 255, 1);
-    isUpdated |= hub.Slider(&data.presets[i].brightness, GH_UINT8, F("Brightness"), 0, 255, 1);
-    hub.EndWidgets();
-    hub.Space(20);
-  }
+    bool isLocked = states[i].isLocked;
+    String lockIcon = isLocked ? "f023" : "f3c1";
+    {
+      gh::Row r(b);
+      if (b.SwitchIcon(&states[i].isLocked).icon(lockIcon).size(1).noLabel(true).click()) {
+        b.refresh();
+      };
 
-  return isUpdated;
-}
-
-bool buildSettings() {
-  bool isUpdated = false;
-  hub.BeginWidgets();
-  isUpdated |= hub.Input(&data.wifiSsid, GH_CSTR, F("WiFi SSID"));
-  isUpdated |= hub.Pass(&data.wifiPass, GH_CSTR, F("WiFi Pass"));
-  isUpdated |= hub.Switch(&data.isStaModeEnabled, F("Use STA mode"));
-  hub.EndWidgets();
-  hub.Button(&restartBtn, F("Restart"));
-  hub.BeginWidgets();
-  hub.Button(&resetBtn, F("Reset to default (Hold for 5 seconds for reset)"), GHcolor(255, 0, 0));
-  hub.EndWidgets();
-  return isUpdated;
-}
-
-bool buildMain() {
-  bool isUpdated = false;
-  hub.BeginWidgets();
-  hub.WidgetSize(40);
-
-  isUpdated |= hub.Switch_(F("LedToggle"), &data.isLedEnabled, F("Toggle"));
-  String presetsNames = "";
-  for (byte i = 0; i < MAX_PRESETS_SIZE; i++) {
-    presetsNames += String(data.presets[i].name);
-    if (i != MAX_PRESETS_SIZE - 1) {
-      presetsNames += ",";
+      {
+        gh::Col c(b, 3);
+        b.Input(data.presets[i].name).label("Name").disabled(isLocked).maxLen(MAX_PRESET_NAME_LENGTH);
+        {
+          gh::Row r(b);
+          b.Slider(&data.presets[i].hue).label("Hue").range(0, 255, 1).disabled(isLocked);
+          b.Slider(&data.presets[i].saturation).label("Saturation").range(0, 255, 1).disabled(isLocked);
+          b.Slider(&data.presets[i].brightness).label("Brightness").range(0, 255, 1).disabled(isLocked);
+        }
+      }
     }
   }
-  hub.WidgetSize(60);
-  isUpdated |= hub.Select(&data.currentPresetIndex, presetsNames, F("Preset"));
-
-  hub.EndWidgets();
-  return isUpdated;
 }
 
-void hubBuild() {
-  bool isUpdated = false;
-  if (hub.Tabs(&tabIndex, F("Main,Presets,Settings"))) {
-    hub.refresh();
+void buildSettings(gh::Builder& b) {
+  b.Input(data.wifiSsid).label("WiFi SSID");
+  b.Pass(data.wifiPass).label("WiFi Pass");
+  {
+    gh::Row r(b);
+    b.Switch(&data.useAPInstead).label("Use AP (default STA)");
+    b.Switch(&data.isMqttEnabled).label("Use MQTT");
   }
-  if (tabIndex == 0) {
-    isUpdated |= buildMain();
+  b.Input(data.mqttHost).label("MQTT Host");
+  b.Input(&data.mqttPort).label("MQTT Port");
+  b.Input(data.mqttUser).label("MQTT User");
+  b.Pass(data.mqttPass).label("MQTT Pass");
+}
+
+void buildSystem(gh::Builder& b) {
+  bool isRestartConfirmed;
+  if (b.Confirm_("confirm restart", &isRestartConfirmed).text("Confirm restart").click()) {
+    if (isRestartConfirmed) {
+      dataSaveAndRestart();
+    }
   }
-  if (tabIndex == 1) {
-    isUpdated |= buildPresets();
+
+  if (b.Button().label("Restart").click()) {
+    hub.sendAction("confirm restart");
   }
-  if (tabIndex == 2) {
-    isUpdated |= buildSettings();
+  
+  bool isResetConfirmed;
+  if (b.Confirm_("confirm reset", &isResetConfirmed).text("Confirm resetting all settings to default").click()) {
+    if (isResetConfirmed)  {
+      dataResetAndRestart();
+    }
   }
-  if (isUpdated) {
+
+  if (b.Button()
+    .label("Reset to defaults")
+    .color(gh::Colors::Red)
+    .click()) {
+      hub.sendAction("confirm reset");
+  }
+}
+
+void buildMain(gh::Builder& b) {
+  {
+    gh::Row r(b);
+    b.Switch_("LedToggle", &data.isLedEnabled).label("Toggle");
+    String presetsNames = "";
+    for (byte i = 0; i < MAX_PRESETS_SIZE; i++) {
+      presetsNames += String(data.presets[i].name);
+      if (i != MAX_PRESETS_SIZE - 1) {
+        presetsNames += ";";
+      }
+    }
+    b.Select(&data.currentPresetIndex).text(presetsNames).label("Preset");
+  }
+}
+
+
+void buildTabs(gh::Builder& b) {
+  if (b.Tabs(&tab).text("Main;Presets").click()) {
+    b.refresh();
+  }
+  if (tab == 0) {
+    buildMain(b);
+  }
+  if (tab == 1) {
+    buildPresets(b);
+  }
+}
+
+void buildMenu(gh::Builder& b) {
+  b.Menu("Control;Settings;System");
+  b.show(b.menu() == 0);
+  buildTabs(b);
+  b.show(b.menu() == 1);
+  buildSettings(b);
+  b.show(b.menu() == 2);
+  buildSystem(b);
+}
+
+
+
+
+void hubBuild(gh::Builder& b) {
+  buildMenu(b);
+  if (b.changed()) {
     memory.update();
   }
 }
-
-GHtimer resetTimer;
 
 void hubSetup() {
   hub.onBuild(hubBuild);
   hub.begin();
 }
 
-void processBtns() {
-  if (restartBtn.changed()) {
-    dataSaveAndRestart();
-  }
-  if (resetBtn.changed()) {
-    if (resetBtn) {
-      resetTimer.start(5000);
-    } else {
-      resetTimer.stop();
-    }
-
-  }
-}
-
 void updateToggle() {
-  static GHtimer tmr(1000);
+  static gh::Timer tmr(1000);
   if (tmr) {
-    hub.sendUpdate("LedToggle", String(data.isLedEnabled));
+    hub.sendUpdate("LedToggle", data.isLedEnabled);
   }
 }
 
 void hubTick() {
   hub.tick();
   updateToggle();
-  processBtns();
-  if (resetTimer) {
-    resetTimer.stop();
-    if (resetBtn) {
-      dataResetAndRestart();
-    }
-  }
 }

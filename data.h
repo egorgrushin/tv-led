@@ -1,9 +1,10 @@
 #include <EEManager.h>
 #define MAX_PRESETS_SIZE 20
+#define MAX_PRESET_NAME_LENGTH 30
 
 
 struct Preset {
-  char name[20] = "";
+  char name[MAX_PRESET_NAME_LENGTH] = "";
   uint8_t hue = 0;
   uint8_t saturation = 0;
   uint8_t brightness = 0;
@@ -11,12 +12,16 @@ struct Preset {
 
 struct Data {
   Preset presets[MAX_PRESETS_SIZE] = {};
-  bool isStaModeEnabled = false;
+  bool useAPInstead = true;
   bool isLedEnabled = true;
   byte currentPresetIndex = 0;
   char wifiSsid[16] = "";
   char wifiPass[16] = "";
-
+  bool isMqttEnabled = false;
+  char mqttHost[16] = "";
+  uint16_t mqttPort = 0;
+  char mqttUser[16] = "";
+  char mqttPass[16] = "";
 };
 
 Data data;
